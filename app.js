@@ -12,8 +12,10 @@
   // ---------- Versión y novedades ----------
   // Al publicar cambios: añadir una entrada AL PRINCIPIO de NOVEDADES, poner su versión en los ?v= de index.html, en
   // APP_VERSION y subir CACHE_NAME en sw.js. Formato de versión: AAAA.NN.
-  const APP_VERSION = "2026.18";
+  const APP_VERSION = "2026.19";
   const NOVEDADES = [
+    { version: "2026.19", fecha: "Octubre 2026", titulo: "Auditar las acciones de un análisis de causas", cambios: [
+      "Nuevo botón «Cargar archivo de ACR · Ishikawa» en «Mis auditorías»: con la copia de seguridad (.json) de la app ACR · Ishikawa, elige un análisis y sus acciones de mejora y se crea una auditoría nueva con un criterio por acción (su indicador, el del criterio) para comprobar si se aplican.", "Nuevo origen de una auditoría: «Análisis de causas»."] },
     { version: "2026.17", fecha: "Octubre 2026", titulo: "Evidencia de Lectura Crítica", cambios: [
       "Nuevo origen «Evidencia científica»: con «Cargar archivo de Lectura Crítica» la evidencia de un artículo leído con la app Lectura Crítica (desde su copia de seguridad .json) queda como origen de la auditoría, y su pregunta PICO se convierte en un criterio («En…, se aplica: …») que puedes ajustar. Avisa si la decisión fue esperar o descartar."] },
     { version: "2026.12", fecha: "Octubre 2026", titulo: "Cargar archivo de Rondas de Seguridad", cambios: [
@@ -463,6 +465,47 @@
     toast(`Auditoría creada con ${plural(a.criterios.length, "criterio", "criterios")}, uno por punto caliente. Completa el proceso y el objetivo.`, 5000);
   }
 
+  // «Cargar archivo de ACR · Ishikawa»: lee el paquete «acrishikawa-analisis» v1 que deja esa app en este navegador o su copia .json.
+  // Crea una auditoría nueva con un criterio por acción elegida (acrFuera = acciones desmarcadas «análisis|acción»).
+  let acrAbierto = false, acrHash = "", acrCopia = null;
+  const acrFuera = new Set();
+  function acrDisponible() {
+    if (acrCopia) return Object.assign({ origen: "copia" }, acrCopia);
+    return { origen: "nada" };
+  }
+  const acrIds = an => an.acciones.filter(x => !acrFuera.has(an.id + "|" + x.id)).map(x => x.id);
+  const FZ_ACR = { fuerte: "Fuerte", intermedia: "Intermedia", debil: "Débil" };
+  function acrHtml() {
+    const d = acrDisponible(), lista = d.analisis || [];
+    let cuerpo;
+    if (d.origen === "nada") cuerpo = `<div class="note">ℹ Elige la copia de seguridad (.json) de la app ACR · Ishikawa.</div>`;
+    else if (d.error) cuerpo = avisoHtml({ nivel: "error", texto: d.error === "version" ? "Estos datos de ACR · Ishikawa son de una versión que esta app aún no sabe leer. Actualiza las dos apps y vuelve a intentarlo. No se ha importado nada." : "No son datos de la app ACR · Ishikawa. Usa la copia de seguridad (.json) que descarga esa app. No se ha importado nada." });
+    else if (!lista.length) cuerpo = `<div class="note">ℹ ${d.origen === "copia" ? "La copia cargada" : "La app ACR · Ishikawa de este navegador"} no tiene ningún análisis con acciones de mejora todavía (los ejemplos no se comparten).</div>`;
+    else cuerpo = `<p class="field-sub">${d.origen === "copia" ? "De la copia cargada" : "Guardados en la app ACR · Ishikawa de este navegador"}${d.generado ? ` · actualizados el ${esc(fechaCorta(d.generado))}` : ""}. Desmarca las acciones que no quieras auditar:</p>
+      <div class="amfe-lista">${lista.map((an, i) => { const n = acrIds(an).length; return `<div class="amfe-op amfe-op--rondas">
+        <div class="amfe-op-txt"><b>${esc(L.nombreAnalisisAcr(an))}</b><span>${an.tipo === "acr" ? "Análisis causa raíz" : "Diagrama de Ishikawa"}${an.unidad ? " · " + esc(an.unidad) : ""}${an.sac ? ` · SAC ${an.sac}` : ""} · ${plural(an.acciones.length, "acción", "acciones")}</span>
+          <div class="aud-rgs">${an.acciones.map(x => { const on = !acrFuera.has(an.id + "|" + x.id); return `<button type="button" class="aud-rg${on ? " on" : ""}" data-act="acr-pt" data-k="${esc(an.id + "|" + x.id)}" aria-pressed="${on}"><span class="aud-check">${on ? "✓" : ""}</span><span class="aud-rg-t"><b>${esc(x.que)}</b><span>${esc([x.fuerza ? "Acción " + FZ_ACR[x.fuerza].toLowerCase() : "", x.indicador ? "indicador: " + x.indicador.nombre : "sin indicador", x.responsable].filter(lleno).join(" · "))}</span></span></button>`; }).join("")}</div></div>
+        <button class="btn btn--primary" data-act="acr-traer" data-i="${i}"${n ? "" : " disabled"}>Crear la auditoría</button></div>`; }).join("")}</div>`;
+    return `<div class="card pegar no-print" data-zona="acr">
+      <h3 class="sub-h">Cargar archivo de ACR · Ishikawa</h3>
+      <p class="field-sub">Las <b>acciones de mejora</b> de un análisis causa raíz o de un diagrama de Ishikawa. Se crea una <b>auditoría nueva</b> con un criterio por acción, para comprobar con una muestra si se aplica; su indicador pasa a ser el del criterio. Los datos <b>se copian</b>: si el análisis cambia, vuelve a traerlo.</p>
+      ${cuerpo}
+      <div class="toolbar"><button class="btn${d.origen === "nada" ? " btn--primary" : ""}" data-act="acr-archivo">Cargar la copia .json de ACR · Ishikawa</button><button class="btn" data-act="acr-cerrar">Cancelar</button></div>
+    </div>`;
+  }
+  function repintarAcr() {
+    if (location.hash.startsWith("#/auditorias")) renderAuditorias();
+    const z = $("[data-zona='acr']"); if (z) z.scrollIntoView({ block: "nearest" });
+  }
+  function traerAcr(i) {
+    const d = acrDisponible(), an = d.analisis && d.analisis[i]; if (!an) return;
+    const ids = acrIds(an); if (!ids.length) return;
+    const a = L.auditoriaDesdeAcr(an, genId, hoy(), ids);
+    datosUsuario.auditorias.push(a); acrAbierto = false; acrCopia = null; acrFuera.clear(); guardar(true);
+    location.hash = "#/auditoria/" + a.id;
+    toast(`Auditoría creada con ${plural(a.criterios.length, "criterio", "criterios")}, uno por acción, con su indicador. Completa el proceso y el objetivo.`, 5000);
+  }
+
   function renderMapa(m) {
     actualMapa = m; actualAud = null; nAyuda = 0;
     if (document.body.classList.contains("ver-informe")) { renderMapaInforme(m); return; }
@@ -565,10 +608,11 @@
     view.innerHTML = `
       <h1 class="page-title">Mis auditorías</h1>
       <p class="page-lead">Cada auditoría recorre el ciclo completo: inicio y diseño (Planificar), recogida de datos (Hacer), informe (Verificar) y mejora con seguimiento (Actuar).</p>
-      <div class="toolbar no-print"><a class="btn btn--primary" href="#/auditoria/nueva">+ Nueva auditoría</a><button class="btn" data-act="rondas-abrir" data-modo="aud">Cargar archivo de Rondas de Seguridad</button><a class="btn" href="#/auditoria/ej-aud-urg">Ver un ejemplo</a></div>
+      <div class="toolbar no-print"><a class="btn btn--primary" href="#/auditoria/nueva">+ Nueva auditoría</a><button class="btn" data-act="rondas-abrir" data-modo="aud">Cargar archivo de Rondas de Seguridad</button><button class="btn" data-act="acr-abrir">Cargar archivo de ACR · Ishikawa</button><a class="btn" href="#/auditoria/ej-aud-urg">Ver un ejemplo</a></div>
       ${rondasAbierto === "aud" ? rondasHtml() : ""}
+      ${acrAbierto ? acrHtml() : ""}
       ${lista.length ? `<div class="cuadro-lista">${lista.map(tarjetaAud).join("")}</div>`
-        : `<div class="placeholder-box"><p><b>Todavía no tienes ninguna auditoría.</b></p><p>Puedes crearla desde los hallazgos clave de un Mapa de Riesgos, traer lo que falla una y otra vez en tus rondas de seguridad o empezar directamente si nace de un estándar, un incidente, un indicador o un encargo.</p></div>`}`;
+        : `<div class="placeholder-box"><p><b>Todavía no tienes ninguna auditoría.</b></p><p>Puedes crearla desde los hallazgos clave de un Mapa de Riesgos, traer lo que falla una y otra vez en tus rondas de seguridad o las acciones de un análisis causa raíz, o empezar directamente si nace de un estándar, un incidente, un indicador o un encargo.</p></div>`}`;
   }
   // En qué fase va una auditoría (la primera que no está terminada)
   function faseDe(a) {
@@ -2106,6 +2150,7 @@
     document.body.classList.toggle("ver-informe", informe);
     actualMapa = null; actualAud = null; actualPlan = null;
     if (rondasAbierto && location.hash !== rondasHash) { rondasAbierto = false; rondasCopia = null; rondasFuera.clear(); }
+    if (acrAbierto && location.hash !== acrHash) { acrAbierto = false; acrCopia = null; acrFuera.clear(); }
     const idR = partes[1] || "";
     const ej = ejemplos();
     modoEjemplo = partes[0] === "ejemplos" || (esIdEjemplo(idR) && [...ej.mapas, ...ej.auditorias, ...ej.planes].some(x => x.id === idR));
@@ -2349,6 +2394,13 @@
     else if (a === "rondas-archivo") $("#input-rondas").click();
     else if (a === "rondas-pt") { const k = b.dataset.k; if (rondasFuera.has(k)) rondasFuera.delete(k); else rondasFuera.add(k); repintarRondas(); }
     else if (a === "rondas-traer") traerRondas(Number(b.dataset.i));
+    else if (a === "acr-abrir") { acrAbierto = true; acrHash = location.hash; acrCopia = null; acrFuera.clear(); repintarAcr(); }
+    if (a === "acr-abrir") $("#input-acr").click();
+    else if (a === "acr-cerrar") { acrAbierto = false; acrCopia = null; acrFuera.clear(); repintarAcr(); }
+    else if (a === "acr-olvidar") { acrCopia = null; acrFuera.clear(); repintarAcr(); }
+    else if (a === "acr-archivo") $("#input-acr").click();
+    else if (a === "acr-pt") { const k = b.dataset.k; if (acrFuera.has(k)) acrFuera.delete(k); else acrFuera.add(k); repintarAcr(); }
+    else if (a === "acr-traer") traerAcr(Number(b.dataset.i));
     else if (a === "pegar-ok" && m) {
       const p = L.parsearTabla($("#pegar-txt").value); if (!p.riesgos.length) return;
       p.riesgos.forEach(x => m.riesgos.push(Object.assign(L.nuevoRiesgo(genId()), x)));
@@ -2649,6 +2701,17 @@
       if (!rondasAbierto) { rondasAbierto = actualPlan ? "plan" : "aud"; rondasHash = location.hash; }
       rondasCopia = L.leerRondas(o); rondasFuera.clear(); repintarRondas();
       if (rondasCopia.error) toast("No se ha importado nada: revisa el aviso.", 4000);
+    };
+    fr.readAsText(f);
+  });
+  $("#input-acr").addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ""; if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      let o = null; try { o = JSON.parse(fr.result); } catch (er) { /* */ }
+      if (!acrAbierto) { acrAbierto = true; acrHash = location.hash; }
+      acrCopia = L.analisisDeAcr(o); acrFuera.clear(); repintarAcr();
+      if (acrCopia.error) toast("No se ha importado nada: revisa el aviso.", 4000);
     };
     fr.readAsText(f);
   });
