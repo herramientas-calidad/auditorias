@@ -1,6 +1,6 @@
 # Auditorías
 
-Aplicación web: **https://herramientas-calidad.github.io/auditorias/** (versión 2026.17).
+Aplicación web: **https://herramientas-calidad.github.io/auditorias/** (versión 2026.18).
 
 Aplicación web (PWA) estática, sin dependencias, que funciona sin conexión y se puede instalar en el móvil, para planificar, realizar, informar y hacer el seguimiento de auditorías de calidad y seguridad del paciente, paso a paso y aprendiendo mientras se hace: del Mapa de Riesgos a la mejora continua, siguiendo el ciclo PDCA.
 

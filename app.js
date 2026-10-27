@@ -12,7 +12,7 @@
   // ---------- Versión y novedades ----------
   // Al publicar cambios: añadir una entrada AL PRINCIPIO de NOVEDADES, poner su versión en los ?v= de index.html, en
   // APP_VERSION y subir CACHE_NAME en sw.js. Formato de versión: AAAA.NN.
-  const APP_VERSION = "2026.17";
+  const APP_VERSION = "2026.18";
   const NOVEDADES = [
     { version: "2026.17", fecha: "Octubre 2026", titulo: "Evidencia de Lectura Crítica", cambios: [
       "Nuevo origen «Evidencia científica»: con «Cargar archivo de Lectura Crítica» la evidencia de un artículo leído con la app Lectura Crítica (desde su copia de seguridad .json) queda como origen de la auditoría, y su pregunta PICO se convierte en un criterio («En…, se aplica: …») que puedes ajustar. Avisa si la decisión fue esperar o descartar."] },
